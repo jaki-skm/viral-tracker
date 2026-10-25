@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<title>Viral Tracker – Real-time Trending Videos Monitor</title>
+<!--
+=====================================================================
+ 🔥 VIRAL TRACKER — একটি ফাইলের Dashboard
+=====================================================================
+ ▶ দ্রুত শুরু:
+   ১. ফাইলটি ব্রাউজারে ডাবল-ক্লিক করে খুলুন → ডেমো ডেটা দেখাবে।
+   ২. ⚙️ Settings এ Sheet ID + API Key বসান (অথবা নিচের CONFIG এ লিখুন)।
+
+ ▶ Google Sheets API Key কীভাবে পাবেন:
+   ১. console.cloud.google.com → নতুন Project বানান।
+   ২. "APIs & Services → Library" → "Google Sheets API" → Enable।
+   ৩. "Credentials → Create Credentials → API key"।
+   ৪. API key restrict করুন: (ক) Application restriction = HTTP referrers
+      (আপনার ডোমেইন, যেমন https://your-site.vercel.app/*)
+      (খ) API restriction = Google Sheets API only।
+   ৫. Google Sheet এ Share → "Anyone with the link: Viewer"।
+   ৬. Sheet ID = URL এর /d/ এবং /edit এর মাঝের অংশ।
+   ৭. RANGE: যেমন  MAIN DASHBOARD!A1:Z1000  (প্রথম সারি = header)।
+
+ ▶ Sheet এর Header নাম (বড়/ছোট হাতের অক্ষর কোনো সমস্যা নেই):
+   Title, Channel, Origin, Trending In, Language, Category, Views, Likes,
+   Comments, Views/Hour, Engagement, Status, Published, URL
+   (Views/Hour, Engagement, Status না থাকলে নিজে হিসাব করে নেবে।
+    নাম আলাদা হলে নিচের ALIASES এ যোগ করুন।)
+
+ ▶ নিরাপত্তা (গুরুত্বপূর্ণ):
+   Browser এ API key সবাই দেখতে পারে। তাই হয় key restrict করুন,
+   নয়তো PROXY_URL ব্যবহার করুন। Proxy শুধু Sheets এর JSON ({values:[[...]]})
+   ফেরত দিলেই চলবে। Vercel Serverless উদাহরণ (api/sheet.js):
+
+     export default async function handler(req, res) {
+       const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${process.env.SHEET_ID}/values/${encodeURIComponent(process.env.RANGE)}?key=${process.env.API_KEY}`);
+       res.setHeader('Cache-Control','s-maxage=60');
+       res.status(r.status).json(await r.json());
+     }
+
+   এরপর Settings এ Proxy URL = https://your-site.vercel.app/api/sheet
+
+ ▶ Deploy:
+   Netlify: app.netlify.com/drop এ ফাইলটি (index.html নাম দিয়ে) drag & drop করুন।
+   Vercel : ফোল্ডারে index.html রাখুন → `npx vercel` অথবা GitHub repo import করুন।
+=====================================================================
+-->
+<style>
+/* ============ থিম: কালো + একটাই অ্যাকসেন্ট (সোনালি) ============ */
+:root,[data-theme="dark"]{
+  --bg:#0B0B0C; --bg2:#101012; --card:#141416; --card2:#1A1A1D; --text:#ECECEE; --text2:#9A9AA3; --text3:#7A7A84;
+  --accent:#D9B26B; --accent-t:#E7C98F; --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.15);
+  --blue:#8AB4F8; --green:#9AD0A5; --orange:#E0A06A; --yellow:#D9B26B; --red-t:#E58A7B; --skel:#1c1c1f;
+  --shadow:0 12px 32px -16px rgba(0,0,0,.7);
+}
+[data-theme="light"]{
+  --bg:#F7F6F3; --bg2:#F0EEE9; --card:#FFFFFF; --card2:#F7F6F3; --text:#17171A; --text2:#5E5E66; --text3:#6E6E76;
+  --accent:#9A6B1F; --accent-t:#7A5412; --border:rgba(0,0,0,.09); --border2:rgba(0,0,0,.18);
+  --blue:#2457c5; --green:#2f7a44; --orange:#a4601f; --yellow:#9A6B1F; --red-t:#b3392a; --skel:#e9e7e1;
+  --shadow:0 12px 30px -18px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.serif{font-family:'Instrument Serif',Georgia,serif}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+
+/* ============ উপরের বার (brand + tools) এবং তার নিচে Tabs ============ */
+.nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:1240px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;height:58px}
+.nav-in.sub{height:auto;border-top:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:'Instrument Serif',Georgia,serif;font-size:24px;letter-spacing:.2px}
+.brand b{font-weight:400;color:var(--accent-t);font-style:italic;margin-left:3px}
+.mark{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.nav-right{display:flex;align-items:center;gap:8px}
+.live{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:12px;margin-right:6px}
+.live .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.ctl{background:transparent;border:1px solid var(--border);border-radius:9px;padding:7px 12px;color:var(--text);transition:border-color .2s,background .2s}
+.ctl:hover{border-color:var(--border2);background:var(--card)}
+.ctl.ico{width:36px;height:36px;padding:0;display:grid;place-items:center;font-size:16px}
+select.ctl{appearance:none;padding-right:12px}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;width:100%}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--text2);padding:13px 14px;font-weight:500;white-space:nowrap;transition:color .2s}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+
+main{max-width:1240px;margin:0 auto;padding:24px}
+.banner{background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:16px;color:var(--text2)}
+.banner[hidden]{display:none}
+
+/* ============ ছোট Metrics Strip ============ */
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.stat{background:var(--card);padding:14px 18px}
+.stat .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.stat .num{font-family:'Instrument Serif',Georgia,serif;font-size:30px;line-height:1.15;margin-top:2px}
+.stat .delta{font-size:11px;color:var(--text3);min-height:16px}
+.up{color:var(--green)} .down{color:var(--orange)}
+
+/* ============ Search ও Filter ============ */
+.toolbar{display:flex;align-items:center;gap:10px;margin:18px 0 6px;flex-wrap:wrap}
+.search{position:relative;flex:1 1 320px;max-width:520px}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text3)}
+.search input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px 10px 38px}
+.search input:focus{border-color:var(--accent);outline:none}
+.grow{flex:1}
+.meta{color:var(--text2);font-size:13px}
+.cnt:not(:empty){background:var(--accent);color:#111;border-radius:99px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px}
+.fpanel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin:10px 0 6px}
+.fpanel[hidden]{display:none}
+.f-grid,.f-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.f-row{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.fl{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text2)}
+.inp{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:8px 10px;min-width:150px}
+.btn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:7px 13px;font-size:13px;text-decoration:none;display:inline-block;transition:border-color .2s,background .2s}
+.btn:hover{border-color:var(--border2);background:var(--card2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#111;font-weight:600}
+.ms{position:relative}
+.ms-btn{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:8px 10px;min-width:170px;text-align:left}
+.ms-panel{position:absolute;z-index:30;top:100%;left:0;margin-top:4px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;box-shadow:var(--shadow);max-height:260px;overflow:auto;min-width:210px;padding:6px}
+.ms-panel[hidden]{display:none}
+.ms-panel label{display:flex;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--text)}
+.ms-panel label:hover{background:var(--card)}
+.menu{position:relative;display:inline-block}
+.menu summary{list-style:none;cursor:pointer}
+.menu summary::-webkit-details-marker{display:none}
+.menu .menu-list{position:absolute;left:0;z-index:30;margin-top:4px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;box-shadow:var(--shadow);min-width:130px;overflow:hidden}
+.menu .menu-list button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 14px}
+.menu .menu-list button:hover{background:var(--card)}
+
+/* ============ শিরোনাম ============ */
+#panel{margin-top:22px}
+.h2{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:34px;line-height:1.1;margin-bottom:18px;letter-spacing:.2px}
+
+/* ============ ভিডিও সারি (Ranked list) ============ */
+.rows{display:flex;flex-direction:column;gap:10px}
+.vrow{display:grid;grid-template-columns:44px 168px 1fr auto;gap:18px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 18px 14px 14px;transition:border-color .2s,transform .2s}
+.vrow:hover{border-color:var(--border2)}
+.vrow.norank{grid-template-columns:168px 1fr auto}
+.rk{font-family:'Instrument Serif',Georgia,serif;font-size:30px;color:var(--text3);text-align:center}
+.vrow:nth-child(-n+3) .rk{color:var(--accent-t)}
+.thumbw{position:relative;aspect-ratio:16/9;border-radius:9px;overflow:hidden;background:linear-gradient(135deg,var(--card2),var(--bg2));border:1px solid var(--border)}
+.thumbw .ini{position:absolute;inset:0;display:grid;place-items:center;font-family:'Instrument Serif',Georgia,serif;font-size:38px;color:var(--text3)}
+.thumbw img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vbody{min-width:0}
+.vtop{display:flex;align-items:center;gap:12px;margin-bottom:3px}
+.vt{font-size:16px;font-weight:600;line-height:1.35}
+.vt a{text-decoration:none}
+.vt a:hover{color:var(--accent-t)}
+.sub{color:var(--text3);font-size:12px}
+.vstats{text-align:right;min-width:190px}
+.vstats .big{font-family:'Instrument Serif',Georgia,serif;font-size:34px;line-height:1}
+.vstats .big small{font-family:'Inter',sans-serif;font-size:12px;color:var(--text3);margin-left:3px}
+.vstats dl{display:grid;grid-template-columns:repeat(2,auto);gap:2px 16px;justify-content:end;margin-top:8px;font-size:12px}
+.vstats dt{color:var(--text3);text-align:right}
+.vstats dd{color:var(--text);text-align:right;margin:0}
+.vrow.feature{grid-template-columns:44px 300px 1fr auto;padding:20px 24px 20px 16px;background:linear-gradient(135deg,var(--card),var(--card2));border-color:var(--border2)}
+.vrow.feature .vt{font-size:24px;font-family:'Instrument Serif',Georgia,serif;font-weight:400;line-height:1.2}
+.vrow.feature .vstats .big{font-size:48px}
+.vrow.feature .rk{font-size:40px;color:var(--accent-t)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text2)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.p-ultra,.p-viral{color:var(--accent-t)}
+.p-ultra i{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent)}
+.p-viral i{background:var(--accent)}
+.p-trending i{background:transparent;border:1.5px solid var(--accent)}
+.p-rising i{background:var(--text2)}
+.badge{display:inline-block;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);border:1px solid var(--border2);border-radius:99px;padding:0 8px}
+.b-ultra,.b-viral{color:var(--accent-t);border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.actions .btn{padding:4px 10px;font-size:12px;color:var(--text2)}
+.actions .btn:hover{color:var(--text)}
+.share{position:relative}
+.share summary{list-style:none;cursor:pointer}
+.share summary::-webkit-details-marker{display:none}
+.share .sh-list{position:absolute;bottom:100%;left:0;z-index:10;margin-bottom:6px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:6px;display:flex;gap:4px;box-shadow:var(--shadow)}
+.sh-list a{padding:4px 9px;border-radius:6px;text-decoration:none;font-size:12px;color:var(--text2)}
+.sh-list a:hover{background:var(--card);color:var(--text)}
+.fav-on{color:var(--accent-t)!important;border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.loadmore{text-align:center;margin-top:20px}
+
+/* ============ Table ============ */
+.tbl-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-weight:600}
+th button{background:none;border:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit}
+th button:hover{color:var(--text)}
+tbody tr:last-child td{border-bottom:0}
+tr.row:hover{background:var(--card2)}
+.sc{font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);font-variant-numeric:tabular-nums}
+.sc-hi{color:var(--accent-t);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.sc-mid{color:var(--text)}
+.detail td{background:var(--card2)}
+
+/* ============ Group Cards / Accordion ============ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.gcard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;transition:border-color .2s}
+.gcard:hover{border-color:var(--border2)}
+.gcard h3{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:24px;margin-bottom:8px}
+.acc{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden}
+.acc summary{padding:16px 20px;cursor:pointer;font-size:16px;font-weight:600}
+.acc .acc-body{padding:0 20px 20px}
+ol.vl,ul.vl{padding-left:20px}
+ol.vl li,ul.vl li{margin:7px 0}
+ol.vl a{text-decoration:none}
+ol.vl a:hover{color:var(--accent-t)}
+
+/* ============ Charts / Gauge ============ */
+.charts{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px}
+.chart-box h3{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin-bottom:10px}
+.chart-box.wide{grid-column:1/-1}
+.chart-box canvas{max-height:320px}
+.gauge{position:relative;height:8px;border-radius:8px;background:linear-gradient(90deg,var(--border2),var(--accent));margin:30px 0 8px}
+.gauge i{position:absolute;top:-8px;width:4px;height:24px;background:var(--text);border-radius:3px;transform:translateX(-50%);transition:left .6s}
+.g-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+
+/* ============ Skeleton / Modal / Toast / Footer ============ */
+.cards{display:flex;flex-direction:column;gap:10px}
+.skel{background:var(--skel);border-radius:14px;height:100px;animation:pulse 1.2s ease-in-out infinite}
+dialog{background:var(--card);color:var(--text);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(760px,94vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow);margin:auto}
+dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
+dialog h2{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:28px;margin-bottom:12px}
+.fld{display:flex;flex-direction:column;gap:5px;margin:12px 0}
+.fld input{width:100%}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+#toasts{position:fixed;right:16px;bottom:16px;z-index:100;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--card2);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px;box-shadow:var(--shadow);max-width:340px}
+.toast.err{border-left-color:var(--orange)}
+footer{border-top:1px solid var(--border);margin-top:48px;padding:24px;color:var(--text3);font-size:12px;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:center}
+footer a{color:var(--text2)}
+.empty{padding:60px 20px;text-align:center;color:var(--text2);border:1px dashed var(--border2);border-radius:14px}
+
+/* ============ Responsive ============ */
+@media (max-width:1100px){.vrow.feature{grid-template-columns:44px 220px 1fr auto}.vrow{grid-template-columns:44px 140px 1fr auto}.vrow.norank{grid-template-columns:140px 1fr auto}}
+@media (max-width:900px){.metrics{grid-template-columns:repeat(3,1fr)}.charts{grid-template-columns:1fr}.live{display:none}}
+@media (max-width:720px){
+  main{padding:16px}.nav-in{padding:0 16px}
+  .vrow,.vrow.feature,.vrow.norank{grid-template-columns:96px 1fr;gap:12px;padding:12px;align-items:start}
+  .vrow .rk{display:none}.vrow.norank .rk{display:none}
+  .vrow .vstats,.vrow.feature .vstats{grid-column:1/-1;text-align:left;min-width:0;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  .vrow .vstats dl{display:flex;gap:12px;margin:0;justify-content:flex-start}
+  .vrow .vstats dt{display:none}
+  .vstats .big,.vrow.feature .vstats .big{font-size:26px}
+  .vrow.feature .vt{font-size:19px}
+  .vt{font-size:14px}
+  .thumbw .ini{font-size:24px}
+  .h2{font-size:28px}
+}
+@media (max-width:520px){.metrics{grid-template-columns:repeat(2,1fr)}.stat .num{font-size:26px}.ms-btn,.inp{min-width:0;width:100%}.f-grid>*,.f-row>*{flex:1 1 100%}.search{max-width:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.nav,.toolbar,.fpanel,footer,.metrics,#toasts,.actions,.banner{display:none!important}body{background:#fff;color:#000}.vrow,.gcard,.acc,.chart-box{border:1px solid #ccc;break-inside:avoid}}
+</style>
+</head>
+<body>
+<noscript>এই Dashboard চালাতে JavaScript লাগবে।</noscript>
+
+<!-- ===== 1) উপরের বার + Tabs (সবচেয়ে গুরুত্বপূর্ণ নেভিগেশন সবসময় উপরে) ===== -->
+<header class="nav" role="banner">
+  <div class="nav-in">
+    <a class="brand" href="#" aria-label="Viral Tracker"><span class="mark" aria-hidden="true"></span><span>Viral<b>Tracker</b></span></a>
+    <div class="nav-right">
+      <div class="live" aria-hidden="true"><span class="dot"></span><span class="mono" id="clock">--</span></div>
+      <label class="sr-only" for="langSel">Language</label>
+      <select id="langSel" class="ctl" aria-label="Language">
+        <option value="en">EN</option>
+        <option value="bn">বাংলা</option>
+      </select>
+      <button id="btnRefresh" class="ctl ico" data-i18n-title="refresh" title="Refresh" aria-label="Refresh">↻</button>
+      <button id="btnTheme" class="ctl ico" data-i18n-title="theme" title="Theme" aria-label="Toggle theme">☾</button>
+      <button id="btnSettings" class="ctl ico" data-i18n-title="settings" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </div>
+  <div class="nav-in sub"><nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav></div>
+</header>
+
+<main id="main">
+  <div class="banner" id="banner" hidden role="status"></div>
+
+  <!-- ===== 2) ছোট Metrics Strip ===== -->
+  <section aria-label="Key metrics"><div class="metrics" id="metrics"></div></section>
+
+  <!-- ===== 3) Search + Filter (Filter বাটনে ক্লিক করলে খুলবে) ===== -->
+  <section class="toolbar" aria-label="Search">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <label for="q" class="sr-only">Search</label>
+      <input id="q" type="search" list="suggest" autocomplete="off" data-i18n-ph="searchPh" placeholder="Search">
+      <datalist id="suggest"></datalist>
+    </div>
+    <button class="ctl" id="btnFilters" aria-expanded="false" aria-controls="fpanel"><span data-i18n="filters">Filters</span><span class="cnt" id="fcount"></span></button>
+    <span class="meta" id="resultCount" aria-live="polite"></span>
+    <span class="grow"></span>
+    <span class="meta"><span data-i18n="lastUpdated">Last Updated</span> <span id="lastUpdated" class="mono">--</span></span>
+  </section>
+  <section class="fpanel" id="fpanel" hidden aria-label="Filters">
+    <div class="f-grid">
+      <div class="fl"><span data-i18n="country">Country</span><div class="ms" data-ms="country"></div></div>
+      <div class="fl"><span data-i18n="language">Language</span><div class="ms" data-ms="language"></div></div>
+      <div class="fl"><span data-i18n="category">Category</span><div class="ms" data-ms="category"></div></div>
+      <div class="fl"><span data-i18n="status">Status</span><div class="ms" data-ms="status"></div></div>
+      <label class="fl"><span data-i18n="from">From</span><input type="date" id="dFrom" class="inp"></label>
+      <label class="fl"><span data-i18n="to">To</span><input type="date" id="dTo" class="inp"></label>
+    </div>
+    <div class="f-row">
+      <button class="btn" id="btnReset"><span data-i18n="reset">Reset</span></button>
+      <button class="btn primary" id="btnApply"><span data-i18n="apply">Apply Filters</span></button>
+      <details class="menu">
+        <summary class="btn"><span data-i18n="export">Export</span> ▾</summary>
+        <div class="menu-list">
+          <button data-act="export" data-fmt="csv">CSV</button>
+          <button data-act="export" data-fmt="xls">Excel</button>
+          <button data-act="export" data-fmt="pdf">PDF</button>
+        </div>
+      </details>
+      <select id="savedSel" class="inp" aria-label="Saved filters"></select>
+      <button class="btn" id="btnSaveFilter"><span data-i18n="saveFilter">Save filter</span></button>
+      <button class="btn" id="btnDelFilter" aria-label="Delete saved filter">✕</button>
+    </div>
+  </section>
+
+  <!-- ===== 4) মূল কনটেন্ট (Tab অনুযায়ী) ===== -->
+  <div id="panel" role="tabpanel" tabindex="0"></div>
+</main>
+
+<!-- ===== 5) Footer ===== -->
+<footer>
+  <span><span data-i18n="lastUpdated">Last Updated</span>: <span id="lastUpdated2">--</span></span>
+  <span><span data-i18n="source">Data Source</span>: Google Sheets</span>
+  <span><span data-i18n="support">Support</span>: <a id="supportLink" href="#">support@example.com</a></span>
+  <a href="#" id="aboutLink" data-i18n="about">About &amp; Instructions</a>
+  <span>© <span id="year"></span> Viral Tracker</span>
+</footer>
+
+<div id="toasts" aria-live="polite"></div>
+
+<!-- Detail modal (video list / channel / category ...) -->
+<dialog id="detailDlg"><div id="detailBody"></div><div class="dlg-actions"><button class="btn" data-act="closeDlg" data-dlg="detailDlg"><span data-i18n="close">Close</span></button></div></dialog>
+
+<!-- Settings modal -->
+<dialog id="settingsDlg">
+  <h2>⚙️ <span data-i18n="settings">Settings</span></h2>
+  <div class="fld"><label for="sSheet" data-i18n="sheetId">Sheet ID</label><input id="sSheet" class="inp" autocomplete="off"></div>
+  <div class="fld"><label for="sKey" data-i18n="apiKey">API Key</label><input id="sKey" class="inp" type="password" autocomplete="off"></div>
+  <div class="fld"><label for="sRange" data-i18n="range">Range</label><input id="sRange" class="inp" autocomplete="off"></div>
+  <div class="fld"><label for="sProxy" data-i18n="proxy">Proxy URL</label><input id="sProxy" class="inp" autocomplete="off" placeholder="https://your-site.vercel.app/api/sheet"></div>
+  <div class="fld"><label for="sInt" data-i18n="interval">Auto-refresh (min)</label><input id="sInt" class="inp" type="number" min="1" max="60"></div>
+  <p class="meta">🔒 Key/Sheet ID এই ব্রাউজারের localStorage এ থাকে। Key অবশ্যই HTTP-referrer দিয়ে restrict করুন, অথবা Proxy ব্যবহার করুন।</p>
+  <div class="f-row">
+    <button class="btn" id="btnNotif">🔔 <span data-i18n="notif">Enable notifications</span></button>
+    <button class="btn" id="btnClear">🧹 <span data-i18n="clearCache">Clear cache</span></button>
+  </div>
+  <h3 style="margin-top:16px" data-i18n="stats">Usage stats</h3>
+  <div id="analyticsBox" class="meta mono"></div>
+  <div class="dlg-actions">
+    <button class="btn" data-act="closeDlg" data-dlg="settingsDlg"><span data-i18n="cancel">Cancel</span></button>
+    <button class="btn primary" id="btnSaveSettings"><span data-i18n="save">Save</span></button>
+  </div>
+</dialog>
+
+<!-- About modal -->
+<dialog id="aboutDlg">
+  <h2>📋 <span data-i18n="about">About</span></h2>
+  <div class="meta" style="line-height:1.8">
+    <p><b>Setup:</b> Settings → Sheet ID + API Key → Save.</p>
+    <p><b>Sheet headers:</b> Title, Channel, Origin, Trending In, Language, Category, Views, Likes, Comments, Views/Hour, Engagement, Status, Published, URL</p>
+    <p><b>Status rule (না থাকলে):</b> Views/Hour ≥ 200K = Ultra Viral · ≥ 50K = Viral · ≥ 10K = Trending · ≥ 2K = Rising.</p>
+    <p><b>Shortcuts:</b> ← → দিয়ে tab বদলান।</p>
+  </div>
+  <div class="dlg-actions"><button class="btn" data-act="closeDlg" data-dlg="aboutDlg"><span data-i18n="close">Close</span></button></div>
+</dialog>
+
+<!-- Chart.js (শুধু Trend Analysis tab এর জন্য) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   ১) CONFIG — এখানে নিজের তথ্য বসাতে পারেন (অথবা Settings থেকে)
+   ===================================================================== */
+const CONFIG = {
+  SHEET_ID: '',                         // আপনার Google Sheet ID
+  API_KEY: '',                          // restricted API key
+  RANGE: 'MAIN DASHBOARD!A1:Z1000',     // Sheet tab এর নাম + range
+  PROXY_URL: '',                        // (ঐচ্ছিক) নিরাপদ backend proxy
+  REFRESH_MIN: 5,                       // auto refresh (মিনিট)
+  SUPPORT_EMAIL: 'support@example.com',
+  // Status এর সীমা (Views/Hour অনুযায়ী) — Sheet এ Status কলাম না থাকলে ব্যবহার হবে
+  THRESH: { ultra: 200000, viral: 50000, trending: 10000, rising: 2000 }
+};
+
+// Sheet এর header নামের বিকল্প — আপনার header আলাদা হলে এখানে যোগ করুন
+const ALIASES = {
+  title:['title','video title','video','name'],
+  channel:['channel','channel name'],
+  origin:['origin','origin country','country'],
+  trendingIn:['trending in','trending_in','trending countries','countries'],
+  language:['language','lang'],
+  category:['category','cat'],
+  views:['views','view count','total views'],
+  likes:['likes','like count'],
+  comments:['comments','cmts','comment count'],
+  vph:['views/hour','views per hour','views/hr','vph','views_per_hour'],
+  engagement:['engagement','engagement %','engagement rate'],
+  status:['status','viral status'],
+  published:['published','published at','publish date','published date','date'],
+  url:['url','link','video url']
+};
+
+/* =====================================================================
+   ২) ভাষা (i18n) — English / বাংলা
+   ===================================================================== */
+const I18N = {
+ en:{tagline:'Real-time Trending Videos Monitor',lastUpdated:'Last Updated',filters:'Filters',refresh:'Refresh',theme:'Toggle theme',settings:'Settings',
+  totalVideos:'Total Videos',totalViews:'Total Views',viralVideos:'Viral Videos',trendingVideos:'Trending Videos',avgVph:'Avg Views/Hr',uniqueChannels:'Unique Channels',
+  searchPh:'Type a title or channel name…',country:'Country',language:'Language',category:'Category',status:'Status',from:'From',to:'To',all:'All',selected:'selected',
+  reset:'Reset',apply:'Apply Filters',export:'Export',saveFilter:'Save filter',savedFilters:'Saved filters…',filterName:'Name for this filter',matches:'videos match',
+  tHot:'Hottest',tRising:'Rising',tCountry:'By Country',tCategory:'By Category',tLang:'By Language',tChannel:'By Channel',tTrend:'Trend Analysis',tFav:'Favorites',
+  hotTitle:"Hottest Right Now",risingTitle:'Rising Channels (Top 10)',countryTitle:'Trending by Country',categoryTitle:'Trending by Category',langTitle:'Trending by Language',channelTitle:'All Channels',trendTitle:'Trending Analysis',
+  rank:'Rank',channelName:'Channel',avgViews:'Avg Views',viralRate:'Viral Rate',score:'Score',recommend:'Recommend',videos:'Videos',views:'Views',likes:'Likes',comments:'Comments',vph:'Views/Hour',engagement:'Engagement',published:'Published',
+  watch:'Watch',copy:'Copy link',copied:'Link copied!',share:'Share',origin:'Origin',trendingIn:'Trending in',loadMore:'Load more',noData:'No data found',showAll:'Show all',showLess:'Show less',topVideos:'Top videos',
+  follow:'Follow',unfollow:'Unfollow',viewMore:'View more',rec_must:'MUST FOLLOW',rec_rising:'RISING STAR',rec_watch:'WATCH',
+  st_ultra:'ULTRA VIRAL',st_viral:'VIRAL',st_trending:'TRENDING',st_rising:'RISING',st_normal:'NORMAL',
+  save:'Save',cancel:'Cancel',close:'Close',about:'About & Instructions',support:'Support',source:'Data Source',sheetId:'Sheet ID',apiKey:'API Key',range:'Range',proxy:'Proxy URL (optional)',interval:'Auto-refresh (min)',notif:'Enable notifications',stats:'Usage stats',clearCache:'Clear cache',
+  demoMode:'Demo mode — connect your Google Sheet from ⚙️ Settings.',errKey:'Check the API key / sheet sharing settings.',errNet:'Network problem — showing cached data.',errRate:'API quota reached — try again shortly.',
+  newViral:'New ULTRA VIRAL video!',milestone:'Channel reached MUST FOLLOW!',healthScore:'Viral Health Score',day:'Daily',week:'Weekly',month:'Monthly',saveImg:'Save image',viewsTrend:'Views trend',catDist:'Category distribution',topCountries:'Top countries',
+  videosTrending:'Videos trending',avgPerVideo:'Avg views/video',topLanguage:'Top language',topCategory:'Top category',risingIn:'Rising in',countriesWord:'countries',trend:'Trend',langs:'Languages',favVideos:'Favorite videos',favChannels:'Followed channels',emptyFav:'Nothing saved yet.',
+  agoM:'{n} min ago',agoH:'{n} h ago',agoD:'{n} d ago',normal:'Normal',rising:'Rising',trending:'Trending',viral:'Viral',ultra:'Ultra'},
+ bn:{tagline:'রিয়েল-টাইম ট্রেন্ডিং ভিডিও মনিটর',lastUpdated:'সর্বশেষ আপডেট',filters:'ফিল্টার',refresh:'রিফ্রেশ',theme:'থিম পরিবর্তন',settings:'সেটিংস',
+  totalVideos:'মোট ভিডিও',totalViews:'মোট ভিউ',viralVideos:'ভাইরাল ভিডিও',trendingVideos:'ট্রেন্ডিং ভিডিও',avgVph:'গড় ভিউ/ঘণ্টা',uniqueChannels:'ইউনিক চ্যানেল',
+  searchPh:'টাইটেল বা চ্যানেলের নাম লিখুন…',country:'দেশ',language:'ভাষা',category:'ক্যাটাগরি',status:'স্ট্যাটাস',from:'শুরু',to:'শেষ',all:'সব',selected:'নির্বাচিত',
+  reset:'রিসেট',apply:'ফিল্টার প্রয়োগ',export:'এক্সপোর্ট',saveFilter:'ফিল্টার সেভ',savedFilters:'সেভ করা ফিল্টার…',filterName:'ফিল্টারের নাম দিন',matches:'টি ভিডিও মিলেছে',
+  tHot:'আজকের সেরা',tRising:'উদীয়মান',tCountry:'দেশ অনুযায়ী',tCategory:'ক্যাটাগরি',tLang:'ভাষা',tChannel:'চ্যানেল',tTrend:'ট্রেন্ড বিশ্লেষণ',tFav:'ফেভারিট',
+  hotTitle:'এই মুহূর্তে সবচেয়ে হট',risingTitle:'উদীয়মান চ্যানেল (শীর্ষ ১০)',countryTitle:'দেশ অনুযায়ী ট্রেন্ডিং',categoryTitle:'ক্যাটাগরি অনুযায়ী ট্রেন্ডিং',langTitle:'ভাষা অনুযায়ী ট্রেন্ডিং',channelTitle:'সব চ্যানেল',trendTitle:'ট্রেন্ড বিশ্লেষণ',
+  rank:'র‍্যাঙ্ক',channelName:'চ্যানেল',avgViews:'গড় ভিউ',viralRate:'ভাইরাল হার',score:'স্কোর',recommend:'সুপারিশ',videos:'ভিডিও',views:'ভিউ',likes:'লাইক',comments:'কমেন্ট',vph:'ভিউ/ঘণ্টা',engagement:'এনগেজমেন্ট',published:'প্রকাশিত',
+  watch:'দেখুন',copy:'লিংক কপি',copied:'লিংক কপি হয়েছে!',share:'শেয়ার',origin:'উৎস',trendingIn:'ট্রেন্ডিং',loadMore:'আরও দেখুন',noData:'কোনো ডেটা পাওয়া যায়নি',showAll:'সব দেখুন',showLess:'কম দেখুন',topVideos:'শীর্ষ ভিডিও',
+  follow:'ফলো',unfollow:'আনফলো',viewMore:'বিস্তারিত',rec_must:'অবশ্যই ফলো করুন',rec_rising:'উদীয়মান তারকা',rec_watch:'নজরে রাখুন',
+  st_ultra:'আল্ট্রা ভাইরাল',st_viral:'ভাইরাল',st_trending:'ট্রেন্ডিং',st_rising:'উদীয়মান',st_normal:'সাধারণ',
+  save:'সেভ',cancel:'বাতিল',close:'বন্ধ',about:'পরিচিতি ও নির্দেশনা',support:'সাপোর্ট',source:'ডেটা সোর্স',sheetId:'শিট আইডি',apiKey:'এপিআই কী',range:'রেঞ্জ',proxy:'প্রক্সি ইউআরএল (ঐচ্ছিক)',interval:'অটো-রিফ্রেশ (মিনিট)',notif:'ব্রাউজার নোটিফিকেশন চালু করুন',stats:'ব্যবহার পরিসংখ্যান',clearCache:'ক্যাশ মুছুন',
+  demoMode:'ডেমো মোড — ⚙️ সেটিংস থেকে আপনার Google Sheet যুক্ত করুন।',errKey:'এপিআই কী / শিট শেয়ারিং ঠিক আছে কিনা দেখুন।',errNet:'নেটওয়ার্ক সমস্যা — ক্যাশ ডেটা দেখানো হচ্ছে।',errRate:'এপিআই লিমিট শেষ — একটু পরে চেষ্টা করুন।',
+  newViral:'নতুন আল্ট্রা ভাইরাল ভিডিও!',milestone:'চ্যানেল "অবশ্যই ফলো করুন" স্তরে পৌঁছেছে!',healthScore:'ভাইরাল হেলথ স্কোর',day:'দৈনিক',week:'সাপ্তাহিক',month:'মাসিক',saveImg:'ছবি সেভ',viewsTrend:'ভিউ ট্রেন্ড',catDist:'ক্যাটাগরি বণ্টন',topCountries:'শীর্ষ দেশ',
+  videosTrending:'ট্রেন্ডিং ভিডিও',avgPerVideo:'গড় ভিউ/ভিডিও',topLanguage:'শীর্ষ ভাষা',topCategory:'শীর্ষ ক্যাটাগরি',risingIn:'উদীয়মান',countriesWord:'দেশে',trend:'ট্রেন্ড',langs:'ভাষা',favVideos:'ফেভারিট ভিডিও',favChannels:'ফলো করা চ্যানেল',emptyFav:'এখনো কিছু সেভ করা হয়নি।',
+  agoM:'{n} মিনিট আগে',agoH:'{n} ঘণ্টা আগে',agoD:'{n} দিন আগে',normal:'সাধারণ',rising:'উদীয়মান',trending:'ট্রেন্ডিং',viral:'ভাইরাল',ultra:'আল্ট্রা'}
+};
+const t = k => (I18N[S.lang] && I18N[S.lang][k]) || I18N.en[k] || k;
+
+/* =====================================================================
+   ৩) Global State
+   ===================================================================== */
+const ls = {   // localStorage এর নিরাপদ wrapper (private mode এ error দিলেও ক্র্যাশ করবে না)
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const S = {
+  lang: ls.get('vt_lang','en'), theme: ls.get('vt_theme','dark'),
+  cfg: Object.assign({sheetId:CONFIG.SHEET_ID, apiKey:CONFIG.API_KEY, range:CONFIG.RANGE, proxy:CONFIG.PROXY_URL, refreshMin:CONFIG.REFRESH_MIN}, ls.get('vt_settings',{})),
+  raw: [], lastUpdated: null, mode: 'demo', fetching: false,
+  filters: {q:'', country:[], language:[], category:[], status:[], from:'', to:''},
+  tab: 'hot', hotCount: 10,
+  sort: { rising:{key:'score',dir:-1}, channel:{key:'avgViews',dir:-1} },
+  expanded: new Set(), openCountries: new Set(), allCountries: new Set(),
+  favs: ls.get('vt_favs',{v:[],c:[]}), saved: ls.get('vt_saved',{}),
+  analytics: ls.get('vt_analytics',{tabs:{},searches:{}}),
+  trendRange: 'day', charts: [], timer: null
+};
+
+/* =====================================================================
+   ৪) Helper ফাংশন
+   ===================================================================== */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+// XSS সুরক্ষা: ডেটা HTML এ বসানোর আগে সবসময় esc() করা হয়
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const locale = () => S.lang === 'bn' ? 'bn-BD' : 'en-US';
+// বড় সংখ্যা → 5.2M / 123K
+function fmt(n){
+  n = Number(n) || 0; const a = Math.abs(n);
+  if (a >= 1e9) return (n/1e9).toFixed(1).replace(/\.0$/,'') + 'B';
+  if (a >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M';
+  if (a >= 1e3) return (n/1e3).toFixed(a >= 1e5 ? 0 : 1).replace(/\.0$/,'') + 'K';
+  return String(Math.round(n));
+}
+function parseNum(x){            // "5.2M", "123,000", "2.36%" সব সংখ্যায় রূপান্তর
+  if (typeof x === 'number') return x; if (x == null) return 0;
+  const s = String(x).replace(/[,%\s]/g,'').toLowerCase();
+  const m = s.match(/^(-?[\d.]+)([kmb])?$/);
+  if (!m) return parseFloat(s) || 0;
+  return parseFloat(m[1]) * ({k:1e3,m:1e6,b:1e9}[m[2]] || 1);
+}
+function timeAgo(d){
+  const m = Math.max(1, Math.round((Date.now() - d) / 6e4));
+  if (m < 60) return t('agoM').replace('{n}', m);
+  if (m < 1440) return t('agoH').replace('{n}', Math.round(m/60));
+  return t('agoD').replace('{n}', Math.round(m/1440));
+}
+// দেশের নাম ও ফ্ল্যাগ
+const COUNTRIES = {BD:'Bangladesh',IN:'India',PK:'Pakistan',US:'USA',GB:'UK',NP:'Nepal',LK:'Sri Lanka',AE:'UAE',SA:'Saudi Arabia',CA:'Canada',AU:'Australia',MY:'Malaysia',ID:'Indonesia',DE:'Germany',FR:'France',BR:'Brazil',GLOBAL:'Global'};
+const CNAME_ALIAS = {'united states':'USA','united states of america':'USA','us':'USA','united kingdom':'UK','gb':'UK','great britain':'UK','worldwide':'Global','world':'Global'};
+function canonCountry(s){
+  s = String(s || '').trim(); if (!s) return 'Global';
+  const up = s.toUpperCase(); if (COUNTRIES[up]) return COUNTRIES[up];
+  const lo = s.toLowerCase(); if (CNAME_ALIAS[lo]) return CNAME_ALIAS[lo];
+  return s.replace(/\b\w/g, c => c.toUpperCase());
+}
+function flag(name){
+  const code = Object.keys(COUNTRIES).find(k => COUNTRIES[k] === name);
+  if (!code || code === 'GLOBAL') return '🌐';
+  return String.fromCodePoint(...[...code].map(c => 127397 + c.charCodeAt(0)));
+}
+// শুধু http/https লিংক গ্রহণ (javascript: ইত্যাদি আটকাতে)
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : '';
+const CAT_ICON = {entertainment:'🎬',music:'🎵',sports:'⚽',education:'🎓',news:'📰',gaming:'🎮',food:'🍳',comedy:'😂',technology:'💻',travel:'✈️'};
+const hue = s => { let h = 0; for (const c of String(s)) h = (h*31 + c.charCodeAt(0)) % 360; return h; };
+const sum = (a, f) => a.reduce((x, y) => x + f(y), 0);
+const isViral = v => v.status === 'ultra' || v.status === 'viral';
+function mode(arr){ const m = {}; arr.forEach(x => m[x] = (m[x]||0)+1); return Object.entries(m).sort((a,b)=>b[1]-a[1]); }
+function dist(arr, n=3){ const total = arr.length || 1; return mode(arr).slice(0,n).map(([k,c]) => `${esc(k)} ${Math.round(c/total*100)}%`).join(' · '); }
+function toast(msg, err){
+  const el = document.createElement('div'); el.className = 'toast' + (err ? ' err' : ''); el.textContent = msg;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), 5000);
+}
+
+/* =====================================================================
+   ৫) ডেটা: Sheet থেকে আনা + normalize
+   ===================================================================== */
+function statusFromVph(v){ const T = CONFIG.THRESH; return v >= T.ultra ? 'ultra' : v >= T.viral ? 'viral' : v >= T.trending ? 'trending' : v >= T.rising ? 'rising' : 'normal'; }
+function normStatus(s){
+  s = String(s).toUpperCase();
+  if (s.includes('ULTRA')) return 'ultra'; if (s.includes('VIRAL')) return 'viral';
+  if (s.includes('TREND')) return 'trending'; if (s.includes('RIS')) return 'rising'; return 'normal';
+}
+function ytId(url){ const m = String(url).match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/); return m ? m[1] : ''; }
+
+function normalizeRow(r, idx){
+  const views = parseNum(r.views), likes = parseNum(r.likes), comments = parseNum(r.comments);
+  let pub = r.published ? new Date(r.published) : null;
+  if (!pub || isNaN(pub)) pub = new Date(Date.now() - 864e5);       // তারিখ না থাকলে গত ২৪ ঘণ্টা ধরা হবে
+  const hours = Math.max(1, (Date.now() - pub) / 36e5);
+  const vph = (r.vph !== undefined && r.vph !== '') ? parseNum(r.vph) : Math.round(views / hours);
+  const engagement = (r.engagement !== undefined && r.engagement !== '') ? parseNum(r.engagement) : (views ? (likes + comments) / views * 100 : 0);
+  const origin = canonCountry(r.origin);
+  let tin = String(r.trendingIn || '').split(/[,;|]/).map(canonCountry).filter(Boolean);
+  tin = [...new Set(tin.length ? tin : [origin])];
+  const url = safeUrl(String(r.url || '').trim());
+  const title = String(r.title || 'Untitled').trim();
+  return {
+    id: 'v' + idx + '_' + hue(title + r.channel),
+    title, channel: String(r.channel || 'Unknown').trim(), origin, trendingIn: tin,
+    language: String(r.language || 'Unknown').trim(), category: String(r.category || 'Other').trim(),
+    views, likes, comments, vph, engagement,
+    status: r.status ? normStatus(r.status) : statusFromVph(vph),
+    published: pub, vid: ytId(url),
+    url: url || 'https://www.youtube.com/results?search_query=' + encodeURIComponent(title)
+  };
+}
+
+// Google Sheets API v4 থেকে ডেটা আনা (অথবা Proxy থেকে)
+async function loadSheet(cfg){
+  const url = cfg.proxy ||
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(cfg.sheetId)}/values/${encodeURIComponent(cfg.range)}?key=${encodeURIComponent(cfg.apiKey)}`;
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
+  let res;
+  try { res = await fetch(url, {signal: ctl.signal}); } finally { clearTimeout(to); }
+  if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
+  const values = (await res.json()).values || [];
+  if (values.length < 2) return [];
+  const head = values[0].map(h => String(h).trim().toLowerCase());
+  const map = {};                                  // কোন field কোন column এ আছে
+  for (const f in ALIASES){ const i = head.findIndex(h => ALIASES[f].includes(h)); if (i >= 0) map[f] = i; }
+  return values.slice(1).filter(r => r.some(c => String(c).trim() !== '')).map(r => {
+    const o = {}; for (const f in map) o[f] = r[map[f]]; return o;
+  });
+}
+
+// ডেমো ডেটা (Sheet যুক্ত না করা পর্যন্ত)
+function demoRows(){
+  let seed = 42; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const ch = [['Tech Bangla','Bangladesh','Bengali','Education'],['Music India','India','Hindi','Music'],['Sports BD','Bangladesh','Bengali','Sports'],
+    ['Islamic Channel BD','Bangladesh','Bengali','Entertainment'],['Karachi Vlogs','Pakistan','Urdu','Entertainment'],['Global News Hub','USA','English','News'],
+    ['London Beats','UK','English','Music'],['Chennai Cinema','India','Tamil','Entertainment'],['Gaming Dhaka','Bangladesh','Bengali','Gaming'],
+    ['Learn With Rina','India','English','Education'],['Cricket Zone','India','English','Sports'],['Lahore Kitchen','Pakistan','Urdu','Food']];
+  const tt = ['Amazing Highlights You Must See','Full Recitation – Peaceful Evening','Top 10 Moments This Week','New Song Official Video','Breaking: What Happened Today','Easy Recipe in 10 Minutes','Learn This Skill in 30 Days','Behind The Scenes Vlog','Live Match Reactions','Funny Moments Compilation'];
+  const pool = ['Bangladesh','India','Pakistan','USA','UK','Global'];
+  const rows = [];
+  for (let i = 0; i < 60; i++){
+    const c = ch[Math.floor(rnd() * ch.length)];
+    const hrs = Math.pow(rnd(), 2) * 24 * 20 + 1;
+    const vph = Math.pow(rnd(), 3) * 400000 + 1500;
+    const views = Math.round(vph * Math.min(hrs, 96) + rnd() * 5000);
+    const likes = Math.round(views * (0.02 + rnd() * 0.06));
+    const extra = Array.from({length: Math.floor(rnd() * 3)}, () => pool[Math.floor(rnd() * pool.length)]);
+    rows.push({title: tt[i % tt.length] + ' #' + (i+1), channel: c[0], origin: c[1], trendingIn: [c[1], ...extra].join(','),
+      language: c[2], category: c[3], views, likes, comments: Math.round(likes * (0.03 + rnd() * 0.08)),
+      published: new Date(Date.now() - hrs * 36e5).toISOString(), url: ''});
+  }
+  return rows;
+}
+
+async function fetchData(manual){
+  if (S.fetching) return;
+  S.fetching = true; $('#btnRefresh').classList.add('spin');
+  if (!S.raw.length) renderSkeleton();                                // Loading skeleton
+  const cfg = S.cfg; let rows = null, mode = 'live';
+  try {
+    if (cfg.proxy || (cfg.sheetId && cfg.apiKey)){
+      rows = await loadSheet(cfg); if (!rows.length) throw new Error('empty');
+      ls.set('vt_cache', {t: Date.now(), rows});                      // Caching
+    } else throw new Error('NOCONFIG');
+  } catch(e){
+    if (e.message !== 'NOCONFIG'){
+      // Error handling: কী ধরনের সমস্যা তা বুঝিয়ে বলা
+      toast(e.status === 429 ? t('errRate') : (e.status === 400 || e.status === 403 || e.status === 404) ? t('errKey') : t('errNet'), true);
+    }
+    const c = ls.get('vt_cache', null);
+    if (c){ rows = c.rows; mode = 'cache'; } else { rows = demoRows(); mode = 'demo'; }
+  }
+  S.mode = mode; S.raw = rows.map(normalizeRow); S.lastUpdated = new Date();
+  $('#banner').hidden = mode !== 'demo'; $('#banner').textContent = t('demoMode');
+  checkNotifications();
+  buildFilterOptions(); renderAll();
+  S.fetching = false; $('#btnRefresh').classList.remove('spin');
+  if (manual) toast('✅ ' + new Date().toLocaleTimeString(locale()));
+}
+
+/* =====================================================================
+   ৬) Filter ও Aggregation
+   ===================================================================== */
+function getFiltered(){
+  const f = S.filters, q = f.q.trim().toLowerCase();
+  const from = f.from ? new Date(f.from + 'T00:00:00') : null, to = f.to ? new Date(f.to + 'T23:59:59') : null;
+  return S.raw.filter(v =>
+    (!q || v.title.toLowerCase().includes(q) || v.channel.toLowerCase().includes(q)) &&
+    (!f.country.length || f.country.includes(v.origin) || v.trendingIn.some(c => f.country.includes(c))) &&
+    (!f.language.length || f.language.includes(v.language)) &&
+    (!f.category.length || f.category.includes(v.category)) &&
+    (!f.status.length || f.status.includes(v.status)) &&
+    (!from || v.published >= from) && (!to || v.published <= to));
+}
+function channelStats(list){
+  const m = new Map(); list.forEach(v => { if (!m.has(v.channel)) m.set(v.channel, []); m.get(v.channel).push(v); });
+  return [...m].map(([name, vs]) => {
+    const n = vs.length, avgViews = sum(vs, v => v.views) / n;
+    const viralRate = vs.filter(isViral).length / n * 100;
+    const countries = [...new Set(vs.flatMap(v => v.trendingIn))];
+    const old = [...vs].sort((a,b) => a.published - b.published), h = Math.floor(n / 2);
+    let trend = 0;
+    if (n >= 2){ const a = sum(old.slice(0,h), v=>v.vph)/h, b = sum(old.slice(h), v=>v.vph)/(n-h); trend = a ? (b/a - 1) * 100 : 0; }
+    // স্কোর (০–১০): ভাইরাল হার + গড় ভিউ + কতগুলো দেশে ট্রেন্ড করছে
+    const score = Math.min(10, viralRate/100*5 + Math.min(3, Math.log10(avgViews+1)/2.2) + Math.min(2, countries.length/3));
+    return {name, vs, n, avgViews, viralRate, countries, trend, score,
+      origin: vs[0].origin, category: mode(vs.map(v=>v.category))[0][0], langs: [...new Set(vs.map(v=>v.language))],
+      rec: score >= 8.5 ? 'rec_must' : score >= 7 ? 'rec_rising' : 'rec_watch'};
+  });
+}
+function groupStats(list, keyFn){
+  const m = new Map(); list.forEach(v => { const k = keyFn(v); if (!m.has(k)) m.set(k, []); m.get(k).push(v); });
+  return [...m].map(([key, vs]) => ({key, vs, count: vs.length, views: sum(vs, v=>v.views), viralRate: vs.filter(isViral).length / vs.length * 100}))
+    .sort((a,b) => b.views - a.views);
+}
+const trendIcon = r => r >= 60 ? '🔥' : r >= 40 ? '⭐' : '📈';
+function globalMetrics(){
+  const a = S.raw;
+  return {total: a.length, views: sum(a, v=>v.views), viral: a.filter(isViral).length, trending: a.filter(v=>v.status==='trending').length,
+    vph: a.length ? sum(a, v=>v.vph)/a.length : 0, channels: new Set(a.map(v=>v.channel)).size};
+}
+
+/* =====================================================================
+   ৭) Rendering — Metrics, Filter options
+   ===================================================================== */
+function renderMetrics(){
+  const m = globalMetrics(), prev = ls.get('vt_prev', null);
+  const defs = [['totalVideos','total'],['totalViews','views'],['viralVideos','viral'],['trendingVideos','trending'],['avgVph','vph'],['uniqueChannels','channels']];
+  $('#metrics').innerHTML = defs.map(([lbl, k]) => {
+    let d = '';
+    if (prev && prev[k] !== undefined && prev[k] !== m[k]){
+      const p = prev[k] ? (m[k]/prev[k]-1)*100 : 100;
+      d = m[k] > prev[k] ? `<span class="up">▲ ${p.toFixed(1)}%</span>` : `<span class="down">▼ ${Math.abs(p).toFixed(1)}%</span>`;
+    }
+    const val = (k === 'views' || k === 'vph') ? fmt(m[k]) + (k === 'vph' ? '/hr' : '') : m[k];
+    return `<div class="stat"><div class="lbl">${t(lbl)}</div><div class="num mono">${val}</div><div class="delta">${d}</div></div>`;
+  }).join('');
+  if (S.metricsSaved !== S.lastUpdated){ ls.set('vt_prev', m); S.metricsSaved = S.lastUpdated; }   // পরের বারের তুলনার জন্য সেভ
+}
+function buildFilterOptions(){
+  const uniq = f => [...new Set(S.raw.flatMap(f))].sort((a,b) => a.localeCompare(b));
+  renderMS('country', uniq(v => [v.origin, ...v.trendingIn]).map(x => ({value:x, label:flag(x)+' '+esc(x)})));
+  renderMS('language', uniq(v => [v.language]).map(x => ({value:x, label:esc(x)})));
+  renderMS('category', uniq(v => [v.category]).map(x => ({value:x, label:esc(x)})));
+  renderMS('status', ['ultra','viral','trending','rising','normal'].map(x => ({value:x, label:statusLabel(x)})));
+  // Autocomplete suggestions
+  $('#suggest').innerHTML = [...new Set(S.raw.flatMap(v => [v.title, v.channel]))].slice(0, 200).map(x => `<option value="${esc(x)}">`).join('');
+  renderSaved();
+}
+function renderMS(key, opts){
+  const el = $(`[data-ms="${key}"]`);
+  el.innerHTML = `<button type="button" class="ms-btn" aria-haspopup="true" aria-expanded="false"></button><div class="ms-panel" hidden>` +
+    opts.map(o => `<label><input type="checkbox" value="${esc(o.value)}" ${S.filters[key].includes(o.value) ? 'checked' : ''}> <span>${o.label}</span></label>`).join('') + `</div>`;
+  updateMSButton(key);
+}
+function updateMSButton(key){
+  const n = S.filters[key].length;
+  $(`[data-ms="${key}"] .ms-btn`).textContent = `${t(key)}: ${n ? n + ' ' + t('selected') : t('all')} ▾`;
+}
+function renderSaved(){
+  const names = Object.keys(S.saved);
+  $('#savedSel').innerHTML = `<option value="">${t('savedFilters')}</option>` + names.map(n => `<option>${esc(n)}</option>`).join('');
+}
+const statusLabel = s => t('st_' + s);
+
+/* =====================================================================
+   ৮) Rendering — কার্ড ও কমপ্যাক্ট তালিকা
+   ===================================================================== */
+const isFavV = id => S.favs.v.includes(id), isFavC = n => S.favs.c.includes(n);
+function videoCard(v, rank){
+  const su = encodeURIComponent(v.url), st = encodeURIComponent(v.title);
+  const rk = rank ? String(rank).padStart(2,'0') : '';
+  return `<article class="vrow s-${v.status}${rank === 1 ? ' feature' : ''}${rank ? '' : ' norank'}">
+    ${rank ? `<div class="rk">${rk}</div>` : ''}
+    <div class="thumbw"><span class="ini" aria-hidden="true">${esc(v.channel.slice(0,1).toUpperCase())}</span>${v.vid ? `<img loading="lazy" alt="" src="https://i.ytimg.com/vi/${esc(v.vid)}/mqdefault.jpg">` : ''}</div>
+    <div class="vbody">
+      <div class="vtop"><span class="pill p-${v.status}"><i></i>${t('st_' + v.status)}</span><span class="sub">${timeAgo(v.published)}</span></div>
+      <h3 class="vt"><a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${esc(v.title)}</a></h3>
+      <div class="meta">${esc(v.channel)} · ${flag(v.origin)} ${esc(v.origin)} · ${esc(v.language)} · ${esc(v.category)}</div>
+      <div class="sub">${t('trendingIn')}: ${v.trendingIn.map(esc).join(', ')}</div>
+      <div class="actions">
+        <a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${t('watch')} ↗</a>
+        <button class="btn" data-act="copy" data-url="${esc(v.url)}">${t('copy')}</button>
+        <details class="share"><summary class="btn">${t('share')}</summary><div class="sh-list">
+          <a target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${st}%20${su}">WhatsApp</a>
+          <a target="_blank" rel="noopener noreferrer" href="https://twitter.com/intent/tweet?text=${st}&url=${su}">Twitter</a>
+          <a target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/sharer/sharer.php?u=${su}">Facebook</a>
+          <a target="_blank" rel="noopener noreferrer" href="https://www.linkedin.com/sharing/share-offsite/?url=${su}">LinkedIn</a></div></details>
+        <button class="btn ${isFavV(v.id) ? 'fav-on' : ''}" data-act="favV" data-id="${esc(v.id)}" aria-pressed="${isFavV(v.id)}" aria-label="Favorite">${isFavV(v.id) ? '♥' : '♡'}</button>
+      </div>
+    </div>
+    <div class="vstats mono">
+      <div class="big">${fmt(v.vph)}<small>/hr</small></div>
+      <dl><dt>${t('views')}</dt><dd>${fmt(v.views)}</dd><dt>${t('likes')}</dt><dd>${fmt(v.likes)}</dd><dt>${t('comments')}</dt><dd>${fmt(v.comments)}</dd><dt>${t('engagement')}</dt><dd>${v.engagement.toFixed(2)}%</dd></dl>
+    </div></article>`;
+}
+function miniList(list, limit){
+  return `<ol class="vl">` + list.slice(0, limit).map(v =>
+    `<li><a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${esc(v.title)}</a> — <span class="mono">${fmt(v.views)}</span> <span class="badge b-${v.status}">${statusLabel(v.status)}</span></li>`).join('') + `</ol>`;
+}
+const empty = () => `<div class="empty">🫥 ${t('noData')}</div>`;
+const scClass = s => s >= 8 ? 'sc-hi' : s >= 6 ? 'sc-mid' : 'sc-lo';
+
+/* =====================================================================
+   ৯) Tab গুলোর Rendering
+   ===================================================================== */
+const TABS = [['hot','🔥','tHot'],['rising','🚀','tRising'],['country','🌍','tCountry'],['category','📂','tCategory'],
+              ['lang','🗣️','tLang'],['channel','📊','tChannel'],['trend','📈','tTrend'],['fav','❤️','tFav']];
+function renderTabs(){
+  $('#tabs').innerHTML = TABS.map(([id, ic, k]) =>
+    `<button class="tab" role="tab" id="tab-${id}" data-tab="${id}" aria-selected="${S.tab === id}" tabindex="${S.tab === id ? 0 : -1}">${t(k)}</button>`).join('');
+}
+function destroyCharts(){ S.charts.forEach(c => c.destroy()); S.charts = []; }
+function renderSkeleton(){ $('#panel').innerHTML = `<div class="cards">${'<div class="skel"></div>'.repeat(4)}</div>`; }
+
+function renderTab(){
+  destroyCharts();
+  const list = getFiltered();
+  $('#resultCount').textContent = `${list.length} ${t('matches')}`;
+  const F = S.filters, fc = F.country.length + F.language.length + F.category.length + F.status.length + (F.from ? 1 : 0) + (F.to ? 1 : 0);
+  $('#fcount').textContent = fc || '';
+  $('#panel').setAttribute('aria-labelledby', 'tab-' + S.tab);
+  const R = {hot:renderHot, rising:renderRising, country:renderCountry, category:()=>renderGroup(list,'category'),
+             lang:()=>renderGroup(list,'language'), channel:renderChannel, trend:renderTrend, fav:renderFav};
+  R[S.tab](list);
+}
+// TAB 1: আজকের সেরা ভিডিও
+function renderHot(list){
+  const sorted = [...list].sort((a,b) => b.vph - a.vph), show = sorted.slice(0, S.hotCount);
+  $('#panel').innerHTML = `<h2 class="h2">${t('hotTitle')}</h2>` + (show.length ?
+    `<div class="rows">${show.map((v,i) => videoCard(v, i+1)).join('')}</div>` +
+    (sorted.length > S.hotCount ? `<p class="loadmore"><button class="btn" data-act="more">${t('loadMore')} (${sorted.length - S.hotCount})</button></p>` : '') : empty());
+}
+// TAB 2: উদীয়মান চ্যানেল (টেবিল, sortable, expandable)
+function sortedChannels(list, which){
+  const {key, dir} = S.sort[which];
+  return channelStats(list).sort((a,b) => (typeof a[key] === 'string' ? a[key].localeCompare(b[key]) : a[key] - b[key]) * dir);
+}
+const th = (which, key, label) => {
+  const s = S.sort[which], ar = s.key === key ? (s.dir === 1 ? ' ▲' : ' ▼') : '';
+  return `<th scope="col" aria-sort="${s.key === key ? (s.dir === 1 ? 'ascending' : 'descending') : 'none'}"><button data-act="sort" data-which="${which}" data-key="${key}">${label}${ar}</button></th>`;
+};
+function renderRising(list){
+  const rows = sortedChannels(list, 'rising').slice(0, 10);
+  $('#panel').innerHTML = `<h2 class="h2">${t('risingTitle')}</h2>` + (rows.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>${t('rank')}</th>${th('rising','name',t('channelName'))}${th('rising','origin',t('country'))}${th('rising','avgViews',t('avgViews'))}${th('rising','viralRate',t('viralRate'))}${th('rising','score',t('score'))}</tr></thead><tbody>` +
+    rows.map((c, i) => {
+      const open = S.expanded.has(c.name), med = String(i+1).padStart(2,'0');
+      return `<tr class="row"><td>${med}</td>
+        <td><button class="btn" data-act="expand" data-name="${esc(c.name)}" aria-expanded="${open}">${open ? '▾' : '▸'} ${esc(c.name)}</button><div class="meta">${esc(c.category)} · ${c.langs.map(esc).join(', ')}</div></td>
+        <td>${flag(c.origin)} ${esc(c.origin)}<div class="meta">${t('risingIn')} ${c.countries.length} ${t('countriesWord')}</div></td>
+        <td class="mono">${fmt(c.avgViews)}<div class="meta">${t('trend')}: ${c.trend >= 0 ? '▲ +' : '▼ '}${c.trend.toFixed(0)}%</div></td>
+        <td class="mono">${c.viralRate.toFixed(0)}%<div class="meta">${t('videos')}: ${c.n}</div></td>
+        <td><span class="sc ${scClass(c.score)}">${c.score.toFixed(1)}/10</span><div class="meta">${t(c.rec)}</div></td></tr>` +
+        (open ? `<tr class="detail"><td colspan="6">${miniList(c.vs.sort((a,b)=>b.vph-a.vph), 5)}
+          <button class="btn" data-act="favC" data-name="${esc(c.name)}">${isFavC(c.name) ? '✔ ' + t('unfollow') : '' + t('follow')}</button></td></tr>` : '');
+    }).join('') + `</tbody></table></div>` : empty());
+}
+// TAB 3: দেশ অনুযায়ী (Accordion)
+function renderCountry(list){
+  const countries = [...new Set(list.flatMap(v => v.trendingIn))];
+  const data = countries.map(c => { const vs = list.filter(v => v.trendingIn.includes(c)); return {c, vs: vs.sort((a,b)=>b.views-a.views), views: sum(vs, v=>v.views)}; }).sort((a,b) => b.views - a.views);
+  $('#panel').innerHTML = `<h2 class="h2">${t('countryTitle')}</h2>` + (data.length ? data.map((d, i) => {
+    const n = d.vs.length, all = S.allCountries.has(d.c), viral = d.vs.filter(isViral).length / n * 100;
+    return `<details class="acc" data-country="${esc(d.c)}" ${S.openCountries.has(d.c) || (i === 0 && !S.openCountries.size) ? 'open' : ''}>
+      <summary>${flag(d.c)} ${esc(d.c).toUpperCase()} <span class="meta" style="font-size:13px">— ${n} ${t('videosTrending')} · ${fmt(d.views)}</span></summary>
+      <div class="acc-body"><div class="stats mono"><span>${t('videosTrending')}: ${n}</span><span>${t('totalViews')}: ${fmt(d.views)}</span><span>${t('avgPerVideo')}: ${fmt(d.views/n)}</span><span>${t('viralRate')}: ${viral.toFixed(0)}%</span></div>
+      <div class="meta">${t('topLanguage')}: ${dist(d.vs.map(v=>v.language))}</div><div class="meta">${t('topCategory')}: ${dist(d.vs.map(v=>v.category))}</div>
+      <h3 style="margin:10px 0 4px">${t('topVideos')}</h3>${miniList(d.vs, all ? 999 : 5)}
+      ${n > 5 ? `<button class="btn" data-act="toggleAllC" data-c="${esc(d.c)}">${all ? t('showLess') : t('showAll')}</button>` : ''}</div></details>`;
+  }).join('') : empty());
+}
+// TAB 4 ও 5: ক্যাটাগরি / ভাষা (গ্রিড কার্ড)
+function renderGroup(list, field){
+  const g = groupStats(list, v => v[field]), isCat = field === 'category';
+  $('#panel').innerHTML = `<h2 class="h2">${isCat ? t('categoryTitle') : t('langTitle')}</h2>` + (g.length ?
+    `<div class="grid">${g.map(x => `<div class="gcard">
+      <h3>${esc(x.key)}</h3>
+      <div class="meta mono">${t('videos')}: ${x.count}<br>${t('views')}: ${fmt(x.views)}<br>${t('viralRate')}: ${x.viralRate.toFixed(0)}%<br>${trendIcon(x.viralRate)}</div>
+      <p style="margin-top:10px"><button class="btn" data-act="group" data-field="${field}" data-key="${esc(x.key)}">${t('viewMore')}</button></p></div>`).join('')}</div>` : empty());
+}
+// TAB 6: চ্যানেল তালিকা
+function renderChannel(list){
+  const rows = sortedChannels(list, 'channel');
+  $('#panel').innerHTML = `<h2 class="h2">${t('channelTitle')}</h2>` + (rows.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>${t('rank')}</th>${th('channel','name',t('channelName'))}${th('channel','avgViews',t('avgViews'))}${th('channel','viralRate',t('viralRate'))}${th('channel','n',t('videos'))}${th('channel','score',t('recommend'))}<th></th></tr></thead><tbody>` +
+    rows.map((c, i) => `<tr class="row"><td>${String(i+1).padStart(2,'0')}</td>
+      <td><button class="btn" data-act="channel" data-name="${esc(c.name)}">${esc(c.name)}</button></td>
+      <td class="mono">${fmt(c.avgViews)}</td><td class="mono">${c.viralRate.toFixed(0)}%</td><td>${c.n}</td>
+      <td><span class="sc ${scClass(c.score)}">${c.score.toFixed(1)}</span> ${t(c.rec)}</td>
+      <td><button class="btn" data-act="favC" data-name="${esc(c.name)}">${isFavC(c.name) ? '✔ ' + t('unfollow') : '' + t('follow')}</button></td></tr>`).join('') + `</tbody></table></div>` : empty());
+}
+// TAB 7: Trend Analysis (Chart.js)
+function healthScore(list){
+  if (!list.length) return 0;
+  const w = {ultra:1, viral:.8, trending:.55, rising:.3, normal:0};
+  return sum(list, v => w[v.status]) / list.length * 100;
+}
+function renderTrend(list){
+  if (!list.length){ $('#panel').innerHTML = empty(); return; }
+  const hs = healthScore(list);
+  $('#panel').innerHTML = `<h2 class="h2">${t('trendTitle')}</h2><div class="charts">
+    <div class="chart-box"><h3>${t('catDist')}</h3><canvas id="chPie" role="img" aria-label="${t('catDist')}"></canvas><button class="btn" data-act="chartimg" data-i="0">${t('saveImg')}</button></div>
+    <div class="chart-box"><h3>${t('topCountries')}</h3><canvas id="chBar" role="img" aria-label="${t('topCountries')}"></canvas><button class="btn" data-act="chartimg" data-i="1">${t('saveImg')}</button></div>
+    <div class="chart-box wide"><h3>${t('viewsTrend')}</h3>
+      <div class="actions">${['day','week','month'].map(r => `<button class="btn ${S.trendRange === r ? 'primary' : ''}" data-act="range" data-r="${r}">${t(r)}</button>`).join('')}</div>
+      <canvas id="chLine" role="img" aria-label="${t('viewsTrend')}"></canvas><button class="btn" data-act="chartimg" data-i="2">${t('saveImg')}</button></div>
+    <div class="chart-box wide"><h3>${t('healthScore')}</h3><div class="gauge" role="img" aria-label="${hs.toFixed(0)}%"><i style="left:${Math.min(99, hs)}%"></i></div>
+      <div class="g-lbl"><span>${t('st_normal')}</span><span>${t('st_rising')}</span><span>${t('st_trending')}</span><span>${t('st_viral')}</span><span>${t('st_ultra')}</span></div>
+      <p class="mono" style="text-align:center;font-size:20px;margin-top:8px">${hs.toFixed(0)}%</p></div></div>`;
+  if (typeof Chart === 'undefined'){ $$('#panel canvas').forEach(c => c.replaceWith(Object.assign(document.createElement('p'), {className:'meta', textContent:'Chart.js লোড হয়নি (ইন্টারনেট দরকার)।'}))); return; }
+  const cs = getComputedStyle(document.documentElement);
+  Chart.defaults.color = cs.getPropertyValue('--text2').trim(); Chart.defaults.borderColor = cs.getPropertyValue('--border').trim();
+  const pal = ['#D9B26B','#B8935A','#8F7347','#6B573A','#4A3E2B','#9A9AA3','#62626B','#3A3A40'];
+  // Pie: ক্যাটাগরি বণ্টন
+  const cats = mode(list.map(v => v.category));
+  S.charts.push(new Chart($('#chPie'), {type:'doughnut', data:{labels:cats.map(c=>c[0]), datasets:[{data:cats.map(c=>c[1]), backgroundColor:pal, borderWidth:0}]}}));
+  // Bar: শীর্ষ দেশ
+  const cc = mode(list.flatMap(v => v.trendingIn)).slice(0, 8);
+  S.charts.push(new Chart($('#chBar'), {type:'bar', data:{labels:cc.map(c=>flag(c[0])+' '+c[0]), datasets:[{label:t('videos'), data:cc.map(c=>c[1]), backgroundColor:'#D9B26B'}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}}}));
+  // Line: ভিউ ট্রেন্ড (দৈনিক/সাপ্তাহিক/মাসিক)
+  const r = S.trendRange, now = new Date(), keys = [];
+  const startOf = (d, rg) => { const x = new Date(d); x.setHours(0,0,0,0); if (rg === 'week') x.setDate(x.getDate() - x.getDay()); if (rg === 'month') x.setDate(1); return +x; };
+  const N = {day:7, week:8, month:6}[r];
+  for (let i = N - 1; i >= 0; i--){
+    const d = new Date(now);
+    if (r === 'day') d.setDate(d.getDate() - i); else if (r === 'week') d.setDate(d.getDate() - 7*i); else d.setMonth(d.getMonth() - i, 1);
+    keys.push(startOf(d, r));
+  }
+  const buckets = Object.fromEntries(keys.map(k => [k, 0]));
+  list.forEach(v => { const k = startOf(v.published, r); if (k in buckets) buckets[k] += v.views; });
+  const opt = r === 'month' ? {month:'short', year:'2-digit'} : r === 'week' ? {day:'numeric', month:'short'} : {weekday:'short', day:'numeric'};
+  S.charts.push(new Chart($('#chLine'), {type:'line', data:{labels:keys.map(k => new Date(k).toLocaleDateString(locale(), opt)),
+    datasets:[{label:t('views'), data:keys.map(k => buckets[k]), borderColor:'#D9B26B', backgroundColor:'rgba(217,178,107,.12)', fill:true, tension:.35}]},
+    options:{plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v => fmt(v)}}}}}));
+}
+// TAB 8: ফেভারিট
+function renderFav(){
+  const vs = S.raw.filter(v => isFavV(v.id)), cs = channelStats(S.raw).filter(c => isFavC(c.name));
+  $('#panel').innerHTML = `<h2 class="h2">${t('favVideos')}</h2>` + (vs.length ? `<div class="rows">${vs.map(v => videoCard(v, 0)).join('')}</div>` : `<p class="meta">${t('emptyFav')}</p>`) +
+    `<h2 class="h2" style="margin-top:26px">${t('favChannels')}</h2>` + (cs.length ? `<div class="grid">${cs.map(c => `<div class="gcard"><h3>${esc(c.name)}</h3><div class="meta mono">${fmt(c.avgViews)} · ${c.viralRate.toFixed(0)}%</div>
+      <p style="margin-top:8px"><button class="btn" data-act="channel" data-name="${esc(c.name)}">${t('viewMore')}</button> <button class="btn" data-act="favC" data-name="${esc(c.name)}">${t('unfollow')}</button></p></div>`).join('')}</div>` : `<p class="meta">${t('emptyFav')}</p>`);
+}
+
+/* =====================================================================
+   ১০) Modal (Detail view)
+   ===================================================================== */
+function openDetail(html){ $('#detailBody').innerHTML = html; const d = $('#detailDlg'); if (!d.open) d.showModal(); }
+function showChannel(name){
+  const c = channelStats(S.raw).find(x => x.name === name); if (!c) return;
+  openDetail(`<h2>📺 ${esc(c.name)}</h2><div class="stats mono"><span>${t('videos')}: ${c.n}</span><span>${t('avgViews')}: ${fmt(c.avgViews)}</span><span>${t('viralRate')}: ${c.viralRate.toFixed(0)}%</span><span>${t('score')}: ${c.score.toFixed(1)}/10</span></div>
+    <p class="meta">${flag(c.origin)} ${esc(c.origin)} · ${esc(c.category)} · ${c.langs.map(esc).join(', ')} · ${t(c.rec)}</p>
+    <h3 style="margin:10px 0 4px">${t('videos')}</h3>${miniList(c.vs.sort((a,b)=>b.vph-a.vph), 50)}
+    <button class="btn" data-act="favC" data-name="${esc(c.name)}">${isFavC(c.name) ? '✔ ' + t('unfollow') : '' + t('follow')}</button>`);
+}
+function showGroup(field, key){
+  const vs = S.raw.filter(v => v[field] === key).sort((a,b) => b.views - a.views);
+  const other = field === 'category' ? vs.map(v => v.language) : vs.flatMap(v => v.trendingIn);
+  openDetail(`<h2>${esc(key)}</h2><div class="stats mono"><span>${t('videos')}: ${vs.length}</span><span>${t('views')}: ${fmt(sum(vs, v=>v.views))}</span></div>
+    <p class="meta">${field === 'category' ? t('langs') : t('country')}: ${dist(other, 5)}</p><h3 style="margin:10px 0 4px">${t('topVideos')}</h3>${miniList(vs, 30)}`);
+}
+
+/* =====================================================================
+   ১১) Export (CSV / Excel / PDF)
+   ===================================================================== */
+const CSV_HEAD = ['Title','Channel','Origin','Trending In','Language','Category','Views','Likes','Comments','Views/Hour','Engagement %','Status','Published','URL'];
+function exportRows(list){
+  return list.map(v => [v.title, v.channel, v.origin, v.trendingIn.join(', '), v.language, v.category, v.views, v.likes, v.comments, Math.round(v.vph), v.engagement.toFixed(2), v.status, v.published.toISOString(), v.url]);
+}
+// CSV injection আটকাতে = + - @ দিয়ে শুরু হলে সামনে ' বসানো হয়
+const cell = x => { let s = String(x); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+function download(name, mime, content){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type: mime}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function doExport(fmtName){
+  const list = getFiltered(), rows = exportRows(list), stamp = new Date().toISOString().slice(0,10);
+  if (fmtName === 'csv'){
+    download(`viral-tracker-${stamp}.csv`, 'text/csv;charset=utf-8', '\ufeff' + [CSV_HEAD, ...rows].map(r => r.map(cell).join(',')).join('\r\n'));
+  } else if (fmtName === 'xls'){
+    const tbl = '<table border="1"><tr>' + CSV_HEAD.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>' + rows.map(r => '<tr>' + r.map(c => `<td>${esc(c)}</td>`).join('') + '</tr>').join('') + '</table>';
+    download(`viral-tracker-${stamp}.xls`, 'application/vnd.ms-excel', `<html><head><meta charset="UTF-8"></head><body>${tbl}</body></html>`);
+  } else window.print();       // PDF: ব্রাউজারের Print → "Save as PDF"
+}
+
+/* =====================================================================
+   ১২) Notification (নতুন Ultra Viral / চ্যানেল মাইলফলক)
+   ===================================================================== */
+function notify(msg){
+  toast('🔔 ' + msg);
+  if (ls.get('vt_notif', false) && 'Notification' in window && Notification.permission === 'granted') new Notification('🔥 Viral Tracker', {body: msg});
+}
+function checkNotifications(){
+  const seen = ls.get('vt_seen', null), ids = S.raw.filter(v => v.status === 'ultra').map(v => v.title + '|' + v.channel);
+  if (seen) ids.filter(i => !seen.includes(i)).slice(0, 3).forEach(i => notify(t('newViral') + ' ' + i.split('|')[0]));
+  ls.set('vt_seen', ids);
+  const must = channelStats(S.raw).filter(c => c.rec === 'rec_must').map(c => c.name), prev = ls.get('vt_must', null);
+  if (prev) must.filter(n => !prev.includes(n)).slice(0, 2).forEach(n => notify(t('milestone') + ' ' + n));
+  ls.set('vt_must', must);
+}
+
+/* =====================================================================
+   ১৩) Analytics (শুধু এই ব্রাউজারে, কোথাও পাঠানো হয় না)
+   ===================================================================== */
+function track(kind, key){ if (!key) return; const o = S.analytics[kind]; o[key] = (o[key] || 0) + 1; ls.set('vt_analytics', S.analytics); }
+function renderAnalytics(){
+  const top = o => Object.entries(o).sort((a,b) => b[1]-a[1]).slice(0, 5).map(([k,v]) => `${esc(k)} (${v})`).join(', ') || '—';
+  $('#analyticsBox').innerHTML = `Most viewed tabs: ${top(S.analytics.tabs)}<br>Top searches: ${top(S.analytics.searches)}`;
+}
+
+/* =====================================================================
+   ১৪) UI: Theme, Language, Clock, Render সমন্বয়
+   ===================================================================== */
+function applyTheme(){ document.documentElement.setAttribute('data-theme', S.theme); $('#btnTheme').textContent = S.theme === 'dark' ? '☾' : '☀'; ls.set('vt_theme', S.theme); }
+function applyStaticI18n(){
+  document.documentElement.lang = S.lang; $('#langSel').value = S.lang;
+  $$('[data-i18n]').forEach(e => e.textContent = t(e.dataset.i18n));
+  $$('[data-i18n-ph]').forEach(e => e.placeholder = t(e.dataset.i18nPh));
+  $$('[data-i18n-title]').forEach(e => e.title = t(e.dataset.i18nTitle));
+  $('#supportLink').textContent = CONFIG.SUPPORT_EMAIL; $('#supportLink').href = 'mailto:' + CONFIG.SUPPORT_EMAIL;
+  $('#year').textContent = new Date().getFullYear();
+}
+function updateClock(){
+  $('#clock').textContent = new Date().toLocaleString(locale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const lu = S.lastUpdated ? S.lastUpdated.toLocaleTimeString(locale()) : '--';
+  $('#lastUpdated').textContent = lu; $('#lastUpdated2').textContent = lu;
+}
+function renderAll(){ applyStaticI18n(); renderTabs(); renderMetrics(); renderTab(); updateClock(); }
+function setupTimer(){
+  clearInterval(S.timer);
+  S.timer = setInterval(() => fetchData(false), Math.max(1, Number(S.cfg.refreshMin) || 5) * 60000);   // প্রতি ৫ মিনিটে auto-refresh
+}
+function setTab(id){ S.tab = id; S.hotCount = 10; track('tabs', id); renderTabs(); renderTab(); $('#tab-' + id).focus(); }
+
+/* =====================================================================
+   ১৫) Event Listeners (Event delegation)
+   ===================================================================== */
+document.addEventListener('click', e => {
+  // Multi-select dropdown খোলা/বন্ধ
+  const msb = e.target.closest('.ms-btn');
+  $$('.ms-panel').forEach(p => { if (!msb || p.previousElementSibling !== msb){ p.hidden = true; p.previousElementSibling.setAttribute('aria-expanded', 'false'); } });
+  if (msb){ const p = msb.nextElementSibling; p.hidden = !p.hidden; msb.setAttribute('aria-expanded', String(!p.hidden)); return; }
+  const tab = e.target.closest('[data-tab]'); if (tab){ setTab(tab.dataset.tab); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const d = b.dataset;
+  switch (d.act){
+    case 'more': S.hotCount += 10; renderTab(); break;
+    case 'copy': navigator.clipboard.writeText(d.url).then(() => toast('📋 ' + t('copied')), () => toast(d.url)); break;
+    case 'favV': { const a = S.favs.v, i = a.indexOf(d.id); i < 0 ? a.push(d.id) : a.splice(i, 1); ls.set('vt_favs', S.favs); renderTab(); break; }
+    case 'favC': { const a = S.favs.c, i = a.indexOf(d.name); i < 0 ? a.push(d.name) : a.splice(i, 1); ls.set('vt_favs', S.favs); renderTab(); if ($('#detailDlg').open) showChannel(d.name); break; }
+    case 'sort': { const s = S.sort[d.which]; s.dir = s.key === d.key ? -s.dir : (d.key === 'name' || d.key === 'origin' ? 1 : -1); s.key = d.key; renderTab(); break; }
+    case 'expand': S.expanded.has(d.name) ? S.expanded.delete(d.name) : S.expanded.add(d.name); renderTab(); break;
+    case 'toggleAllC': S.allCountries.has(d.c) ? S.allCountries.delete(d.c) : S.allCountries.add(d.c); renderTab(); break;
+    case 'group': showGroup(d.field, d.key); break;
+    case 'channel': showChannel(d.name); break;
+    case 'range': S.trendRange = d.r; renderTab(); break;
+    case 'chartimg': { const c = S.charts[Number(d.i)]; if (c){ const a = document.createElement('a'); a.href = c.toBase64Image(); a.download = 'chart.png'; a.click(); } break; }
+    case 'export': doExport(d.fmt); b.closest('details').open = false; break;
+    case 'closeDlg': $('#' + d.dlg).close(); break;
+  }
+});
+// Multi-select এর checkbox
+document.addEventListener('change', e => {
+  const cb = e.target.closest('.ms-panel input'); if (!cb) return;
+  const key = cb.closest('[data-ms]').dataset.ms, arr = S.filters[key];
+  cb.checked ? arr.push(cb.value) : arr.splice(arr.indexOf(cb.value), 1);
+  updateMSButton(key); S.hotCount = 10; renderTab();
+});
+// Accordion খোলা/বন্ধ অবস্থা মনে রাখা
+document.addEventListener('toggle', e => {
+  const c = e.target.dataset && e.target.dataset.country; if (!c) return;
+  e.target.open ? S.openCountries.add(c) : S.openCountries.delete(c);
+}, true);
+// ভাঙা thumbnail লুকানো
+document.addEventListener('error', e => { if (e.target.tagName === 'IMG') e.target.style.display = 'none'; }, true);
+// Tab এ কীবোর্ড নেভিগেশন (← →)
+$('#tabs').addEventListener('keydown', e => {
+  const i = TABS.findIndex(x => x[0] === S.tab); let n = i;
+  if (e.key === 'ArrowRight') n = (i + 1) % TABS.length; else if (e.key === 'ArrowLeft') n = (i - 1 + TABS.length) % TABS.length; else return;
+  e.preventDefault(); setTab(TABS[n][0]);
+});
+// Real-time search (টাইপ করার সাথে সাথে)
+let qTimer, qTrack;
+$('#q').addEventListener('input', e => {
+  clearTimeout(qTimer); qTimer = setTimeout(() => { S.filters.q = e.target.value; S.hotCount = 10; renderTab(); }, 150);
+  clearTimeout(qTrack); qTrack = setTimeout(() => { if (e.target.value.trim().length >= 2) track('searches', e.target.value.trim().toLowerCase()); }, 1200);
+});
+['dFrom','dTo'].forEach(id => $('#' + id).addEventListener('change', e => { S.filters[id === 'dFrom' ? 'from' : 'to'] = e.target.value; S.hotCount = 10; renderTab(); }));
+$('#btnApply').addEventListener('click', () => { S.hotCount = 10; renderTab(); $('#panel').scrollIntoView({behavior:'smooth', block:'start'}); });
+function resetFilters(){
+  S.filters = {q:'', country:[], language:[], category:[], status:[], from:'', to:''};
+  $('#q').value = ''; $('#dFrom').value = ''; $('#dTo').value = ''; buildFilterOptions(); renderTab();
+}
+$('#btnReset').addEventListener('click', resetFilters);
+// কাস্টম ফিল্টার সেভ / লোড / ডিলিট
+$('#btnSaveFilter').addEventListener('click', () => {
+  const name = (prompt(t('filterName')) || '').trim().slice(0, 40); if (!name) return;
+  S.saved[name] = JSON.parse(JSON.stringify(S.filters)); ls.set('vt_saved', S.saved); renderSaved(); $('#savedSel').value = name;
+});
+$('#savedSel').addEventListener('change', e => {
+  const f = S.saved[e.target.value]; if (!f) return;
+  S.filters = Object.assign({q:'', country:[], language:[], category:[], status:[], from:'', to:''}, JSON.parse(JSON.stringify(f)));
+  $('#q').value = S.filters.q; $('#dFrom').value = S.filters.from; $('#dTo').value = S.filters.to; buildFilterOptions(); $('#savedSel').value = e.target.value; renderTab();
+});
+$('#btnDelFilter').addEventListener('click', () => { const n = $('#savedSel').value; if (n){ delete S.saved[n]; ls.set('vt_saved', S.saved); renderSaved(); } });
+// Navbar বাটন
+$('#btnRefresh').addEventListener('click', () => fetchData(true));
+$('#btnTheme').addEventListener('click', () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; applyTheme(); renderTab(); });
+$('#langSel').addEventListener('change', e => { S.lang = e.target.value; ls.set('vt_lang', S.lang); buildFilterOptions(); renderAll(); });
+$('#aboutLink').addEventListener('click', e => { e.preventDefault(); $('#aboutDlg').showModal(); });
+// Settings
+$('#btnSettings').addEventListener('click', () => {
+  $('#sSheet').value = S.cfg.sheetId || ''; $('#sKey').value = S.cfg.apiKey || ''; $('#sRange').value = S.cfg.range || '';
+  $('#sProxy').value = S.cfg.proxy || ''; $('#sInt').value = S.cfg.refreshMin || 5; renderAnalytics(); $('#settingsDlg').showModal();
+});
+$('#btnSaveSettings').addEventListener('click', () => {
+  S.cfg = {sheetId: $('#sSheet').value.trim(), apiKey: $('#sKey').value.trim(), range: $('#sRange').value.trim() || CONFIG.RANGE, proxy: $('#sProxy').value.trim(), refreshMin: Number($('#sInt').value) || 5};
+  ls.set('vt_settings', S.cfg); $('#settingsDlg').close(); setupTimer(); fetchData(true);
+});
+$('#btnClear').addEventListener('click', () => { ['vt_cache','vt_prev','vt_seen','vt_must'].forEach(ls.del); toast('🧹 OK'); });
+$('#btnNotif').addEventListener('click', async () => {
+  if (!('Notification' in window)) return toast('Browser notification supported নয়', true);
+  const p = await Notification.requestPermission(); ls.set('vt_notif', p === 'granted'); toast(p === 'granted' ? '🔔 ON' : '🔕 OFF');
+});
+window.addEventListener('online', () => fetchData(false));
+
+/* =====================================================================
+   ১৬) শুরু!
+   ===================================================================== */
+$('#btnFilters').addEventListener('click', () => { const p = $('#fpanel'); p.hidden = !p.hidden; $('#btnFilters').setAttribute('aria-expanded', String(!p.hidden)); });
+applyTheme(); applyStaticI18n(); renderTabs(); renderSkeleton();
+setInterval(updateClock, 1000);            // প্রতি সেকেন্ডে ঘড়ি আপডেট
+updateClock(); setupTimer(); fetchData(false);
+</script>
+</body>
+</html>
